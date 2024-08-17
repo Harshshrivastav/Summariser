@@ -31,5 +31,6 @@ pytube
 numexpr
 huggingface_hub
 nltk
+langchain_unstructured
 
 
