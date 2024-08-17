@@ -6,7 +6,7 @@ from langchain_groq import ChatGroq
 from langchain.chains.summarize import load_summarize_chain
 from langchain_community.document_loaders import YoutubeLoader, UnstructuredURLLoader
 from dotenv import load_dotenv
-from langchain.docstore.document import Document  # Import Document class
+from langchain.docstore.document import Document
 
 # Load environment variables from .env file
 load_dotenv()
@@ -93,17 +93,21 @@ if st.button("Show Transcript"):
         try:
             with st.spinner("Fetching transcript..."):
                 if "youtube.com" in generic_url:
-                    loader = YoutubeLoader.from_youtube_url(generic_url, add_video_info=True)
+                    try:
+                        loader = YoutubeLoader.from_youtube_url(generic_url, add_video_info=True)
+                        docs = loader.load()
+                    except Exception as youtube_error:
+                        st.warning(f"An issue occurred while processing the YouTube video: {youtube_error}")
+                        docs = []
                 else:
                     loader = UnstructuredURLLoader(
                         urls=[generic_url],
                         ssl_verify=False,
                         headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"}
                     )
+                    docs = loader.load()
                 
-                docs = loader.load()
                 if docs:
-                    # Ensure the content is in plain text
                     transcript_text = docs[0].page_content if hasattr(docs[0], 'page_content') else str(docs[0])
                     st.session_state.transcript = transcript_text
                     st.text_area("Transcript", value=st.session_state.transcript, height=300)
@@ -119,7 +123,6 @@ if st.button("Summarize"):
     if st.session_state.transcript:
         try:
             with st.spinner("Summarizing content..."):
-                # Convert the transcript string to a Document object
                 docs = [Document(page_content=st.session_state.transcript)]
                 
                 prompt_template = PromptTemplate(template="Summarize this content in 300 words:\n{text}", input_variables=["text"])
@@ -132,4 +135,3 @@ if st.button("Summarize"):
             st.error(f"An error occurred while summarizing: {e}")
     else:
         st.error("Transcript is not available. Please fetch the transcript first by clicking 'Show Transcript'.")
-    
