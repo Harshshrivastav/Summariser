@@ -1,11 +1,11 @@
+
 import os
 import validators
 import streamlit as st
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from langchain.chains.summarize import load_summarize_chain
-from pytube import YouTube  # Ensure this import is present
-from youtube_transcript_api import YouTubeTranscriptApi
+from langchain_community.document_loaders import YoutubeLoader, UnstructuredURLLoader
 from dotenv import load_dotenv
 from langchain.docstore.document import Document  # Import Document class
 
@@ -88,42 +88,24 @@ if "transcript" not in st.session_state:
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 
-# Function to fetch YouTube transcript using pytube and youtube_transcript_api
-def fetch_youtube_transcript(youtube_url):
-    try:
-        # Fetch video information
-        yt = YouTube(youtube_url)
-        video_id = yt.video_id
-        
-        # Fetch transcript
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        transcript_text = " ".join([item['text'] for item in transcript])
-        
-        return transcript_text
-
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-        return None
-
 # Fetch and display transcript
 if st.button("Show Transcript"):
     if generic_url and validators.url(generic_url):
         try:
             with st.spinner("Fetching transcript..."):
                 if "youtube.com" in generic_url:
-                    # Use the custom function to fetch the transcript
-                    transcript_text = fetch_youtube_transcript(generic_url)
+                    loader = YoutubeLoader.from_youtube_url(generic_url, add_video_info=True)
                 else:
-                    # Use the UnstructuredURLLoader for non-YouTube URLs
                     loader = UnstructuredURLLoader(
                         urls=[generic_url],
                         ssl_verify=False,
                         headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"}
                     )
-                    docs = loader.load()
-                    transcript_text = docs[0].page_content if docs else None
-
-                if transcript_text:
+                
+                docs = loader.load()
+                if docs:
+                    # Ensure the content is in plain text
+                    transcript_text = docs[0].page_content if hasattr(docs[0], 'page_content') else str(docs[0])
                     st.session_state.transcript = transcript_text
                     st.text_area("Transcript", value=st.session_state.transcript, height=300)
                 else:
@@ -151,3 +133,4 @@ if st.button("Summarize"):
             st.error(f"An error occurred while summarizing: {e}")
     else:
         st.error("Transcript is not available. Please fetch the transcript first by clicking 'Show Transcript'.")
+    
