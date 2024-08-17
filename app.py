@@ -4,9 +4,9 @@ import streamlit as st
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from langchain.chains.summarize import load_summarize_chain
-from langchain_community.document_loaders import YoutubeLoader, UnstructuredURLLoader
+from youtube_transcript_api import YouTubeTranscriptApi
 from dotenv import load_dotenv
-from langchain.docstore.document import Document
+from langchain.docstore.document import Document  # Import Document class
 
 # Load environment variables from .env file
 load_dotenv()
@@ -87,28 +87,42 @@ if "transcript" not in st.session_state:
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 
+# Function to fetch YouTube transcript using pytube and youtube_transcript_api
+def fetch_youtube_transcript(youtube_url):
+    try:
+        # Fetch video information
+        yt = YouTube(youtube_url)
+        video_id = yt.video_id
+        
+        # Fetch transcript
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        transcript_text = " ".join([item['text'] for item in transcript])
+        
+        return transcript_text
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return None
+
 # Fetch and display transcript
 if st.button("Show Transcript"):
     if generic_url and validators.url(generic_url):
         try:
             with st.spinner("Fetching transcript..."):
                 if "youtube.com" in generic_url:
-                    try:
-                        loader = YoutubeLoader.from_youtube_url(generic_url, add_video_info=True)
-                        docs = loader.load()
-                    except Exception as youtube_error:
-                        st.warning(f"An issue occurred while processing the YouTube video: {youtube_error}")
-                        docs = []
+                    # Use the custom function to fetch the transcript
+                    transcript_text = fetch_youtube_transcript(generic_url)
                 else:
+                    # Use the UnstructuredURLLoader for non-YouTube URLs
                     loader = UnstructuredURLLoader(
                         urls=[generic_url],
                         ssl_verify=False,
                         headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"}
                     )
                     docs = loader.load()
-                
-                if docs:
-                    transcript_text = docs[0].page_content if hasattr(docs[0], 'page_content') else str(docs[0])
+                    transcript_text = docs[0].page_content if docs else None
+
+                if transcript_text:
                     st.session_state.transcript = transcript_text
                     st.text_area("Transcript", value=st.session_state.transcript, height=300)
                 else:
@@ -123,6 +137,7 @@ if st.button("Summarize"):
     if st.session_state.transcript:
         try:
             with st.spinner("Summarizing content..."):
+                # Convert the transcript string to a Document object
                 docs = [Document(page_content=st.session_state.transcript)]
                 
                 prompt_template = PromptTemplate(template="Summarize this content in 300 words:\n{text}", input_variables=["text"])
