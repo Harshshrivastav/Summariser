@@ -4,6 +4,7 @@ import streamlit as st
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from langchain.chains.summarize import load_summarize_chain
+from pytube import YouTube  # Ensure this import is present
 from youtube_transcript_api import YouTubeTranscriptApi
 from dotenv import load_dotenv
 from langchain.docstore.document import Document  # Import Document class
